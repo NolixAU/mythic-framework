@@ -772,4 +772,14 @@ Config.PlayerMenu = {
 			return playerState.state.isBlindfolded
 		end,
 	},
+	{
+		icon = "comment-slash",
+		text = "Remove Gag",
+		event = "HUD:Client:RemoveMouthGag",
+		minDist = 3.0,
+		isEnabled = function(data, target)
+			local playerState = Player(target.serverId)
+			return playerState.state.isMouthGagged
+		end,
+	},
 }

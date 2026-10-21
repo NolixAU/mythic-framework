@@ -10,6 +10,7 @@ _characterLoaded = false
 
 USING_MEGAPHONE = false
 USING_MICROPHONE = false
+MOUTH_GAGGED = false
 
 RADIO_TALKING = false
 RADIO_CHANNEL = false
@@ -72,7 +73,7 @@ AddEventHandler("Core:Shared:Ready", function()
 		end)
 
 		Keybinds:Add("voip_radio", "CAPITAL", "keyboard", "Voice - Radio - Push to Talk", function()
-			if _characterLoaded and PLAYER_CONNECTED and not LocalPlayer.state.isCuffed and not LocalPlayer.state.isHardCuffed and not LocalPlayer.state.isDead then
+			if _characterLoaded and PLAYER_CONNECTED and not MOUTH_GAGGED and not LocalPlayer.state.isCuffed and not LocalPlayer.state.isHardCuffed and not LocalPlayer.state.isDead then
 				RadioKeyDown()
 			end
 		end, function()
@@ -110,6 +111,7 @@ AddEventHandler("Characters:Client:Spawn", function()
 
 	CURRENT_VOICE_MODE = 2
 	CURRENT_VOICE_MODE_DATA = VOIP_CONFIG.Modes[CURRENT_VOICE_MODE]
+	MOUTH_GAGGED = LocalPlayer.state.isMouthGagged == true
 
 	StartVOIPGridThreads()
 
@@ -146,6 +148,11 @@ AddEventHandler("Characters:Client:Spawn", function()
 
 	local address, port = GetVOIPMumbleAddress()
 	MumbleSetServerAddress(address, port)
+
+	if MOUTH_GAGGED then
+		NetworkSetVoiceActive(false)
+		NetworkSetTalkerProximity(0.0)
+	end
 end)
 
 RegisterNetEvent("Characters:Client:Logout")
@@ -153,9 +160,35 @@ AddEventHandler("Characters:Client:Logout", function()
 	_characterLoaded = false
 
 	USING_MEGAPHONE = false
+	MOUTH_GAGGED = false
+	NetworkSetVoiceActive(true)
 
 	MumbleSetServerAddress("", 0)
 	Logger:Info("VOIP", "Disconnecting From Mumble (Character Logging Out)")
+end)
+
+
+RegisterNetEvent("VOIP:Client:MouthGag:Set", function(state)
+	MOUTH_GAGGED = state == true
+
+	if MOUTH_GAGGED then
+		if RADIO_TALKING then
+			RadioKeyUp()
+		end
+
+		StopUsingMegaphone()
+		StopUsingMicrophone()
+		NetworkSetVoiceActive(false)
+		NetworkSetTalkerProximity(0.0)
+	else
+		NetworkSetVoiceActive(true)
+
+		if CURRENT_VOICE_MODE_DATA then
+			NetworkSetTalkerProximity(CURRENT_VOICE_MODE_DATA.Range + 0.0)
+		end
+	end
+
+	UpdateVOIPIndicatorStatus()
 end)
 
 AddEventHandler("VOIP:Client:ConnectionState", function(state)
@@ -170,7 +203,12 @@ AddEventHandler("VOIP:Client:ConnectionState", function(state)
 		end
 
 		--MumbleSetAudioInputDistance(CURRENT_VOICE_MODE_DATA.Range + 0.0)
-		NetworkSetTalkerProximity(CURRENT_VOICE_MODE_DATA.Range + 0.0)
+		if MOUTH_GAGGED then
+			NetworkSetVoiceActive(false)
+			NetworkSetTalkerProximity(0.0)
+		else
+			NetworkSetTalkerProximity(CURRENT_VOICE_MODE_DATA.Range + 0.0)
+		end
 		--MumbleSetAudioOutputDistance(50.0)
 	else
 		Logger:Warn("VOIP", "Disconnected from Mumble Server")
@@ -190,6 +228,20 @@ function UpdateVOIPIndicatorStatus()
 	local indicatorColor = "#610000"
 	local indicatorIcon = "microphone-slash"
 	local fillPercent = 100
+
+	if MOUTH_GAGGED then
+		Hud:RegisterStatus(
+			"VOIP",
+			fillPercent,
+			100,
+			indicatorIcon,
+			indicatorColor,
+			false,
+			true,
+			{ id = 1, visibleWhileDead = true }
+		)
+		return
+	end
 
 	if PLAYER_CONNECTED then
 		indicatorColor = "#ababab"
@@ -238,7 +290,7 @@ end
 
 _fuckingVOIP = {
 	Cycle = function(self, num)
-		if playerMuted or USING_MEGAPHONE or USING_MICROPHONE then
+		if playerMuted or MOUTH_GAGGED or USING_MEGAPHONE or USING_MICROPHONE then
 			return
 		end
 		local newMode = CURRENT_VOICE_MODE + 1

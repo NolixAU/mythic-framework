@@ -112,6 +112,30 @@ AddEventHandler("Core:Shared:Ready", function()
 			end
 		end)
 
+		Callbacks:RegisterClientCallback("HUD:MouthGagAction", function(data, cb)
+			Progress:Progress({
+				name = "mouth_gag_action",
+				duration = data.duration or 6000,
+				label = data.label or "Using Gag",
+				useWhileDead = false,
+				canCancel = true,
+				disarm = false,
+				controlDisables = {
+					disableMovement = true,
+					disableCarMovement = true,
+					disableMouse = false,
+					disableCombat = true,
+				},
+				animation = {
+					animDict = "random@mugging4",
+					anim = "struggle_loop_b_thief",
+					flags = 49,
+				},
+			}, function(cancelled)
+				cb(not cancelled)
+			end)
+		end)
+
 		Callbacks:RegisterClientCallback("HUD:PutOnBlindfold", function(data, cb)
 			Progress:Progress({
 				name = "blindfold_action",

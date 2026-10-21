@@ -54,6 +54,41 @@ AddEventHandler("Core:Shared:Ready", function()
 			end
 		end)
 
+		Callbacks:RegisterServerCallback("HUD:RemoveMouthGag", function(source, data, cb)
+			local plyr = Fetch:Source(source)
+			if plyr ~= nil then
+				local char = plyr:GetData("Character")
+				if char ~= nil then
+					local tarState = Player(data).state
+					if tarState.isMouthGagged then
+						Callbacks:ClientCallback(source, "HUD:MouthGagAction", {
+							label = "Removing Gag",
+							duration = 3000,
+						}, function(isSuccess)
+							if isSuccess then
+								if Inventory:AddItem(char:GetData("SID"), "mouth_gag", 1, {}, 1) then
+									tarState.isMouthGagged = false
+									cb(true)
+								else
+									Execute:Client(source, "Notification", "Error", "Failed Adding Item")
+									cb(false)
+								end
+							else
+								cb(false)
+							end
+						end)
+					else
+						Execute:Client(source, "Notification", "Error", "Target Not Gagged")
+						cb(false)
+					end
+				else
+					cb(false)
+				end
+			else
+				cb(false)
+			end
+		end)
+
 		Inventory.Items:RegisterUse("blindfold", "HUD", function(source, item, itemData)
 			Callbacks:ClientCallback(source, "HUD:GetTargetInfront", {}, function(target)
 				if target ~= nil then
@@ -92,6 +127,42 @@ AddEventHandler("Core:Shared:Ready", function()
 				end
 			end)
 		end)
+
+		Inventory.Items:RegisterUse("mouth_gag", "HUD", function(source, item, itemData)
+			Callbacks:ClientCallback(source, "HUD:GetTargetInfront", {}, function(target)
+				if target ~= nil then
+					local tarState = Player(target).state
+					if not tarState.isMouthGagged then
+						if tarState.isCuffed then
+							Callbacks:ClientCallback(source, "HUD:MouthGagAction", {
+								label = "Gagging",
+								duration = 6000,
+							}, function(isSuccess)
+								if isSuccess then
+									if tarState.isCuffed then
+										if Inventory.Items:RemoveSlot(item.Owner, item.Name, 1, item.Slot, 1) then
+											tarState.isMouthGagged = true
+											Execute:Client(target, "Notification", "Info", "You have been gagged")
+										else
+											Execute:Client(source, "Notification", "Error", "Failed Removing Item")
+										end
+									else
+										Execute:Client(source, "Notification", "Error", "Target Not Cuffed")
+									end
+								end
+							end)
+						else
+							Execute:Client(source, "Notification", "Error", "Target Not Cuffed")
+						end
+					else
+						Execute:Client(source, "Notification", "Error", "Target Already Gagged")
+					end
+				else
+					Execute:Client(source, "Notification", "Error", "Nobody Near To Gag")
+				end
+			end)
+		end)
+
 	end)
 end)
 
